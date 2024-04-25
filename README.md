@@ -2,6 +2,26 @@
 
 This repository contains code and documentation for analyzing financial stock market data using various statistical and machine learning techniques. The analysis was performed on a dataset spanning five years (2016-2021) and covering 30 different stocks.
 
+## Dataset Description
+The financial market dataset comprises a comprehensive collection of daily trading information for multiple stocks over a specified time period. Each row in the dataset represents a single trading day for a particular stock, with various attributes captured for analysis and modeling.
+
+Key Attributes:
+1. Date: The date of the trading session.
+2. Symbol: The unique identifier for the stock.
+3. Series: The category or type of security (e.g., equity).
+4. Previous Close: The closing price of the stock from the previous trading day.
+5. Open: The opening price of the stock at the beginning of the trading session.
+6. High: The highest price observed during the trading session.
+7. Low: The lowest price observed during the trading session.
+8. Last: The last traded price of the stock during the trading session.
+9. Close: The closing price of the stock at the end of the trading session.
+10. VWAP (Volume Weighted Average Price): The average price of a stock weighted by trading volume over a specified time period.
+11. Volume: The total number of shares traded during the trading session.
+12. Turnover: The total value of all trades executed during the trading session.
+13. Trades: The total number of trades executed during the trading session.
+14. Deliverable Volume: The volume of shares that were delivered (settled) during the trading session.
+15. % Deliverable: The percentage of deliverable volume relative to total volume traded during the session.
+
 ## Experiments
 
 1. **Descriptive, Prescriptive, and Predictive Statistics**: Analyzed the dataset to understand its characteristics and make predictions about future stock prices.
