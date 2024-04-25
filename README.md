@@ -18,6 +18,7 @@ This repository contains code and documentation for analyzing financial stock ma
 ## Files
 
 - **Financial_Stock_Market_Analysis.ipynb**: Jupyter notebook containing code for all experiments.
+- **Dataset for the Stock Market**
 - **research_paper.pdf**: Research paper discussing optimization algorithms for stock market analysis.
 
 ## Requirements
