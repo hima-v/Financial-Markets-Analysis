@@ -7,14 +7,20 @@ from ..core.config import settings
 from ..core.errors import AppError
 
 
-ALLOWED_CONTENT_TYPES: frozenset[str] = frozenset(
-    {"text/csv", "application/vnd.ms-excel", "application/octet-stream"}
-)
+ALLOWED_CONTENT_TYPES: frozenset[str] = frozenset({"text/csv"})
 
 
 async def read_upload_bytes(file: UploadFile) -> bytes:
     if not file.filename:
         raise AppError(code="missing_filename", message="Missing uploaded filename.")
+
+    # Basic filename allowlist: only .csv uploads supported
+    if not str(file.filename).lower().endswith(".csv"):
+        raise AppError(
+            code="unsupported_file_extension",
+            message="Only .csv uploads are supported.",
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+        )
 
     if not file.content_type or file.content_type not in ALLOWED_CONTENT_TYPES:
         raise AppError(

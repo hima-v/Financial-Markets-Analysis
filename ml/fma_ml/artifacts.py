@@ -20,6 +20,7 @@ class RunInfo:
     n_rows: int
     n_features: int
     metrics: dict
+    calibration: dict | None = None
 
 
 def save_run(*, output_dir: Path, model, info: RunInfo) -> Path:

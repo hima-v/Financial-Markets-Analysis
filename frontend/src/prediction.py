@@ -54,6 +54,10 @@ def post_predict(
     dataset_id: str | None,
     file_name: str | None,
     file_bytes: bytes | None,
+    threshold: float = 0.5,
+    include_threshold_metrics: bool = True,
+    eval_window: int = 252,
+    include_failure_analysis: bool = False,
 ) -> dict:
     parsed = urlparse(base_url)
     if parsed.scheme != "http" or (parsed.hostname or "") not in _ALLOWED_HOSTS:
@@ -63,6 +67,8 @@ def post_predict(
         raise ValueError("Invalid run_id.")
     if not symbol or len(symbol) > 32:
         raise ValueError("Invalid symbol.")
+    if not (0.0 < float(threshold) < 1.0):
+        raise ValueError("threshold must be between 0 and 1.")
 
     boundary = uuid.uuid4().hex
     parts: list[bytes] = []
@@ -79,6 +85,10 @@ def post_predict(
     add_field("run_id", run_id)
     add_field("symbol", symbol)
     add_field("include_features", "true")
+    add_field("threshold", str(float(threshold)))
+    add_field("include_threshold_metrics", "true" if include_threshold_metrics else "false")
+    add_field("eval_window", str(int(eval_window)))
+    add_field("include_failure_analysis", "true" if include_failure_analysis else "false")
 
     if bool(dataset_id) == bool(file_bytes):
         raise ValueError("Provide exactly one of dataset_id or file.")

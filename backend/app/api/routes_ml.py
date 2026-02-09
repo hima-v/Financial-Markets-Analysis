@@ -12,8 +12,9 @@ from ..services.ingest import IngestLimits, load_csv_bytes
 from ..services.storage import load_dataset
 
 from ml.fma_ml.artifacts import load_model
+from ml.fma_ml.constants import DATASET_ID_RE
 from ml.fma_ml.features import FeatureConfig
-from ml.fma_ml.inference import predict_next_day_direction
+from ml.fma_ml.inference import evaluate_threshold, failure_analysis, predict_next_day_direction
 
 
 router = APIRouter(prefix="/ml", tags=["ml"])
@@ -34,13 +35,19 @@ async def predict_endpoint(
     run_id: Annotated[str, Form()] = "",
     symbol: Annotated[str, Form()] = "",
     include_features: Annotated[bool, Form()] = False,
+    threshold: Annotated[float, Form()] = 0.5,
+    include_threshold_metrics: Annotated[bool, Form()] = True,
+    eval_window: Annotated[int, Form()] = 252,
+    include_failure_analysis: Annotated[bool, Form()] = False,
     dataset_id: Annotated[str | None, Form()] = None,
     file: UploadFile | None = File(None),
 ) -> dict:
-    if not run_id or len(run_id) != 32:
+    if not run_id or not DATASET_ID_RE.fullmatch(run_id):
         raise AppError(code="invalid_run_id", message="Invalid run_id.")
     if not symbol or len(symbol) > 32:
         raise AppError(code="invalid_symbol", message="Invalid symbol.")
+    if not (0.0 < float(threshold) < 1.0):
+        raise AppError(code="invalid_threshold", message="threshold must be between 0 and 1.")
 
     df = await _load_frame(dataset_id=dataset_id, file=file)
 
@@ -52,13 +59,47 @@ async def predict_endpoint(
         raise AppError(code="invalid_run_id", message=str(e))
 
     try:
-        res = predict_next_day_direction(df, symbol=symbol, model=model, feature_cfg=FeatureConfig())
+        res = predict_next_day_direction(
+            df, symbol=symbol, model=model, feature_cfg=FeatureConfig(), threshold=float(threshold)
+        )
     except ValueError as e:
         raise AppError(code="inference_failed", message=str(e))
-    out = {"symbol": res.symbol, "as_of": res.as_of, "prob_up": res.prob_up, "predicted_label": res.predicted_label}
+    out = {
+        "symbol": res.symbol,
+        "as_of": res.as_of,
+        "prob_up": res.prob_up,
+        "predicted_label": res.predicted_label,
+        "threshold": float(threshold),
+    }
     if include_features:
         out["features"] = res.features
         if res.explanation is not None:
             out["explanation"] = res.explanation
+
+    if include_threshold_metrics:
+        try:
+            out["threshold_metrics"] = evaluate_threshold(
+                df,
+                symbol=symbol,
+                model=model,
+                feature_cfg=FeatureConfig(),
+                threshold=float(threshold),
+                window=int(eval_window),
+            )
+        except ValueError as e:
+            # Non-fatal: return inference even if evaluation window is invalid / too small.
+            out["threshold_metrics_error"] = str(e)
+
+    if include_failure_analysis:
+        try:
+            out["failure_analysis"] = failure_analysis(
+                df,
+                symbol=symbol,
+                model=model,
+                feature_cfg=FeatureConfig(),
+                threshold=float(threshold),
+            )
+        except ValueError as e:
+            out["failure_analysis_error"] = str(e)
     return out
 

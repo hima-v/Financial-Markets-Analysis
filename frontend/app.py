@@ -39,6 +39,32 @@ from src.validation import validate_dataset
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 
 
+def _sanitize_for_spreadsheet_export(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Mitigate spreadsheet formula injection when exporting CSV.
+
+    If a string cell starts with one of: = + - @, prefix with a single quote.
+    See: common CSV injection patterns in Excel/Sheets.
+    """
+    out = df.copy()
+    dangerous = ("=", "+", "-", "@")
+    for c in out.columns:
+        if out[c].dtype == object:
+            s = out[c]
+
+            def _fix(v):
+                if v is None:
+                    return v
+                if isinstance(v, str):
+                    t = v.lstrip()
+                    if t.startswith(dangerous):
+                        return "'" + v
+                return v
+
+            out[c] = s.map(_fix)
+    return out
+
+
 @st.cache_data(show_spinner=False)
 def _load_and_prepare_csv_bytes(data: bytes, *, nrows: int | None) -> pd.DataFrame:
     df = load_csv_bytes(data, nrows=nrows)
@@ -324,6 +350,26 @@ def main() -> None:
             st.subheader("Step 3 — Predict")
             with st.expander("Advanced", expanded=False):
                 base_url = st.text_input("Backend URL", value="http://127.0.0.1:8000")
+                threshold = st.slider(
+                    "Decision threshold",
+                    min_value=0.05,
+                    max_value=0.95,
+                    value=0.50,
+                    step=0.01,
+                    help="Predicted direction is Up if prob(up) ≥ threshold.",
+                )
+                eval_window = st.number_input(
+                    "Threshold evaluation window (rows)",
+                    min_value=30,
+                    max_value=5000,
+                    value=252,
+                    step=10,
+                    help="Compute precision/recall on the most recent labeled rows.",
+                )
+                include_failure_analysis = st.checkbox(
+                    "Include 'Where it fails' analysis (may be slower)",
+                    value=False,
+                )
             can_predict = (
                 run_id != ""
                 and ((dataset_id.strip() != "") or (file_bytes is not None and len(file_bytes) > 0))
@@ -339,6 +385,10 @@ def main() -> None:
                             dataset_id=dataset_id.strip() or None,
                             file_name=file_name,
                             file_bytes=file_bytes,
+                            threshold=float(threshold),
+                            include_threshold_metrics=True,
+                            eval_window=int(eval_window),
+                            include_failure_analysis=bool(include_failure_analysis),
                         )
                     except Exception as e:
                         st.session_state["predict_result"] = {"error": str(e)}
@@ -357,7 +407,40 @@ def main() -> None:
                 r1.metric("Prob(up)", value=f"{prob:.3f}")
                 r2.metric("Direction", value="Up" if lbl == 1 else "Down")
                 r3.metric("As of", value=str(result["as_of"]))
-                st.caption("Direction is assigned using a 0.5 probability threshold.")
+                st.caption("Direction is assigned using the selected probability threshold.")
+
+                tm = result.get("threshold_metrics", None)
+                if isinstance(tm, dict):
+                    with st.expander("Threshold metrics (recent window)", expanded=False):
+                        c1, c2, c3, c4 = st.columns(4)
+                        c1.metric("Threshold", value=f"{float(tm.get('threshold', 0.5)):.2f}")
+                        c2.metric("Precision", value=f"{float(tm.get('precision', float('nan'))):.3f}")
+                        c3.metric("Recall", value=f"{float(tm.get('recall', float('nan'))):.3f}")
+                        c4.metric("Rows", value=f"{int(tm.get('window_rows', 0)):,}")
+                        st.caption("These metrics are computed on the last labeled rows available in the dataset.")
+
+                fa = result.get("failure_analysis", None)
+                if isinstance(fa, dict):
+                    with st.expander("Where it fails", expanded=False):
+                        by_regime = fa.get("by_volatility_regime", [])
+                        by_year = fa.get("by_year", [])
+                        if isinstance(by_regime, list) and by_regime:
+                            rdf = pd.DataFrame(by_regime)
+                            st.subheader("By volatility regime")
+                            st.dataframe(rdf, use_container_width=True, hide_index=True)
+                            if "balanced_accuracy" in rdf.columns:
+                                fig = px.bar(rdf, x="regime", y="balanced_accuracy", title="Balanced accuracy by regime")
+                                fig.update_layout(margin=dict(l=10, r=10, t=40, b=10), height=320)
+                                st.plotly_chart(fig, use_container_width=True)
+
+                        if isinstance(by_year, list) and by_year:
+                            ydf = pd.DataFrame(by_year)
+                            st.subheader("By year")
+                            st.dataframe(ydf, use_container_width=True, hide_index=True)
+                            if "balanced_accuracy" in ydf.columns:
+                                fig2 = px.line(ydf.sort_values("year"), x="year", y="balanced_accuracy", markers=True, title="Balanced accuracy by year")
+                                fig2.update_layout(margin=dict(l=10, r=10, t=40, b=10), height=320)
+                                st.plotly_chart(fig2, use_container_width=True)
 
                 expl = result.get("explanation", None)
                 if isinstance(expl, dict) and expl.get("method") == "logreg_contributions":
@@ -400,6 +483,7 @@ def main() -> None:
             st.subheader("Export")
             cleaned = df.copy()
             cleaned["date"] = cleaned["date"].dt.date
+            cleaned = _sanitize_for_spreadsheet_export(cleaned)
             st.download_button(
                 "Download cleaned CSV",
                 data=cleaned.to_csv(index=False).encode("utf-8"),

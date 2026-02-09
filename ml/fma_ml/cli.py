@@ -9,7 +9,7 @@ from .inference import predict_next_day_direction
 from .io import LoadConfig, load_frame
 from .models import ModelConfig
 from .splits import SplitConfig
-from .train import TrainConfig, fit_final_model, walk_forward_cv
+from .train import CalibrationConfig, TrainConfig, fit_final_model, walk_forward_cv
 
 
 def main() -> None:
@@ -22,6 +22,8 @@ def main() -> None:
     train.add_argument("--symbol", required=True)
     train.add_argument("--model", choices=["logreg", "dummy"], default="logreg")
     train.add_argument("--splits", type=int, default=5)
+    train.add_argument("--calibrate", choices=["none", "sigmoid", "isotonic"], default="none")
+    train.add_argument("--calib-fraction", type=float, default=0.2)
     train.add_argument("--out", default="artifacts")
 
     predict = sub.add_parser("predict")
@@ -39,10 +41,11 @@ def main() -> None:
             feature=FeatureConfig(),
             split=SplitConfig(n_splits=int(args.splits)),
             model=ModelConfig(kind=str(args.model)),
+            calibration=CalibrationConfig(method=str(args.calibrate), calib_fraction=float(args.calib_fraction)),
         )
 
         cv = walk_forward_cv(df, symbol=str(args.symbol), cfg=cfg)
-        model, n_rows, n_features = fit_final_model(df, symbol=str(args.symbol), cfg=cfg)
+        model, n_rows, n_features, calib_info = fit_final_model(df, symbol=str(args.symbol), cfg=cfg)
 
         info = RunInfo(
             run_id=new_run_id(),
@@ -52,6 +55,7 @@ def main() -> None:
             n_rows=n_rows,
             n_features=n_features,
             metrics=cv,
+            calibration=calib_info,
         )
         out_path = save_run(output_dir=Path(args.out), model=model, info=info)
         print(str(out_path))
