@@ -1,64 +1,111 @@
-# Financial Stock Market Analysis
+# Financial Markets Analysis
 
-This repository contains code and documentation for analyzing financial stock market data using various statistical and machine learning techniques. The analysis was performed on a dataset spanning five years (2016-2021) and covering 30 different stocks.
+This repo contains:
+- `Financial_Markets_Analysis.ipynb`: notebook-based analysis
+- `nse_sensex (1).csv`: historical daily stock data (NSE-style)
+- `frontend/`: interactive dashboard (upload + validation + charts)
+- `backend/`: FastAPI service for validation, analytics, and ML inference
+- `ml/`: time-series-safe training and inference CLI
 
-## Dataset Description
-The financial market dataset comprises a comprehensive collection of daily trading information for multiple stocks over a specified time period. Each row in the dataset represents a single trading day for a particular stock, with various attributes captured for analysis and modeling.
+## Architecture (local-first)
 
-Key Attributes:
-1. Date: The date of the trading session.
-2. Symbol: The unique identifier for the stock.
-3. Series: The category or type of security (e.g., equity).
-4. Previous Close: The closing price of the stock from the previous trading day.
-5. Open: The opening price of the stock at the beginning of the trading session.
-6. High: The highest price observed during the trading session.
-7. Low: The lowest price observed during the trading session.
-8. Last: The last traded price of the stock during the trading session.
-9. Close: The closing price of the stock at the end of the trading session.
-10. VWAP (Volume Weighted Average Price): The average price of a stock weighted by trading volume over a specified time period.
-11. Volume: The total number of shares traded during the trading session.
-12. Turnover: The total value of all trades executed during the trading session.
-13. Trades: The total number of trades executed during the trading session.
-14. Deliverable Volume: The volume of shares that were delivered (settled) during the trading session.
-15. % Deliverable: The percentage of deliverable volume relative to total volume traded during the session.
+- **Frontend** (`frontend/app.py`): Streamlit UI for upload, analytics, and prediction.
+- **Backend** (`backend/app/main.py`): FastAPI endpoints for dataset validation/storage, analytics, and `/ml/predict`.
+- **Local storage**:
+  - datasets: `data/datasets/<dataset_id>/data.parquet` + `meta.json`
+  - model runs: `artifacts/<run_id>/model.joblib` + `run.json`
+- **ML** (`ml/fma_ml`): leakage-safe feature pipeline, walk-forward evaluation, saved artifacts.
 
-## Experiments
+## Dataset format (supported by the dashboard)
 
-1. **Descriptive, Prescriptive, and Predictive Statistics**: Analyzed the dataset to understand its characteristics and make predictions about future stock prices.
-2. **Linear Regression**: Applied linear regression to model the relationship between independent variables and stock prices.
-3. **Logistic Regression**: Used logistic regression to perform classification tasks on the stock market dataset.
-4. **Data Visualization**: Created visualizations to explore patterns and trends in the stock market data.
-5. **Correlation Analysis**: Calculated the correlation matrix and plotted correlation plots to understand relationships among different variables in the dataset.
-6. **Matrix Decomposition**: Performed Singular Value Decomposition (SVD) or other matrix decomposition techniques to analyze the structure of the dataset.
-7. **Hypothesis Testing**: Conducted hypothesis testing to make inferences about population parameters based on sample data.
-8. **ANOVA Testing**: Applied analysis of variance (ANOVA) testing to compare means across multiple groups in the dataset.
-9. **Classification**: Installed relevant packages for classification and evaluated the performance of classifiers using techniques like Particle Swarm Optimization for Support Vector Machine.
-10. **Optimization Algorithm Research**: Prepared a research paper discussing the application of optimization algorithms to stock market analysis.
+Required columns:
+- `DATE` (parseable date)
+- `SYMBOL` (ticker)
+- `CLOSE` (numeric)
 
-## Files
+Recommended columns:
+- `OPEN`, `HIGH`, `LOW`, `VOLUME`
 
-- **Financial_Stock_Market_Analysis.ipynb**: Jupyter notebook containing code for all experiments.
-- **Dataset for the Stock Market**
-- **research_paper.pdf**: Research paper discussing optimization algorithms for stock market analysis.
+The dashboard normalizes these to: `date`, `symbol`, `close`, `open`, `high`, `low`, `volume`.
 
-## Requirements
+## Run the dashboard (Windows PowerShell)
 
-- Python 3.x
-- Jupyter Notebook
-- pandas
-- scikit-learn
-- matplotlib
-- seaborn
-- scipy
+Install Python 3.10 (user scope, secure source):
 
-## Usage
+```powershell
+winget install --id Python.Python.3.10 -e --scope user
+py -0p
+```
 
-1. Clone the repository:
+Start the app:
 
-   ```bash
-   git clone https://github.com/your-username/financial-stock-market-analysis.git
+```powershell
+cd C:\Users\hima2\Financial-Markets-Analysis
+.\scripts\run_frontend.ps1
+```
 
-2. Navigate to the project directory
-    ```bash
-   cd financial-stock-market-analysis
+### What a user does (local-first)
 
+- One command (recommended):
+
+```powershell
+cd C:\Users\hima2\Financial-Markets-Analysis
+.\scripts\run_all.ps1
+```
+
+- Run the backend in one terminal:
+
+```powershell
+cd C:\Users\hima2\Financial-Markets-Analysis
+py -3.10 -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
+```
+
+- Run the frontend in another terminal:
+
+```powershell
+cd C:\Users\hima2\Financial-Markets-Analysis
+.\scripts\run_frontend.ps1
+```
+
+- Open `http://localhost:8501` and:
+  - explore analytics on the repo dataset or upload a CSV
+  - (optional) train a model via CLI and use the **Prediction** tab
+
+### Deployment note
+
+This project is intentionally **local-first**. If you host it, uploaded datasets and saved models live on the server, not on the visitor’s device.
+
+If your machine policy blocks `pip --user`, use a single repo venv instead:
+
+```powershell
+cd C:\Users\hima2\Financial-Markets-Analysis
+py -3.11 -m venv .venv
+.\.venv\Scripts\python -m pip install -r .\frontend\requirements.txt
+.\.venv\Scripts\python -m streamlit run .\frontend\app.py
+```
+
+## ML (local, time-series-safe)
+
+Install ML deps:
+
+```powershell
+cd C:\Users\hima2\Financial-Markets-Analysis
+py -3.10 -m pip install -r .\ml\requirements.txt
+```
+
+Train a baseline next-day direction model using a saved dataset:
+
+```powershell
+$DATASET_ID="46648df56102493a9b366b91862fedae"
+py -3.10 -m ml.fma_ml.cli train --dataset-id $DATASET_ID --symbol ASIANPAINT --model logreg --splits 5 --out artifacts
+```
+
+The command prints the run folder path (contains `model.joblib` + `run.json`).
+
+Predict next-day direction probability using a saved run:
+
+```powershell
+$RUN_ID="85181c56309a4e62a2eb96f60ad0371e"
+$DATASET_ID="46648df56102493a9b366b91862fedae"
+py -3.10 -m ml.fma_ml.cli predict --run-id $RUN_ID --dataset-id $DATASET_ID --symbol ASIANPAINT
+```

@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     max_upload_bytes: int = Field(default=50 * 1024 * 1024, ge=1, le=500 * 1024 * 1024)
     data_dir: str = str(Path("data").resolve())
     max_saved_datasets: int = Field(default=50, ge=1, le=5000)
+    artifacts_dir: str = str(Path("artifacts").resolve())
+    max_inference_points: int = Field(default=1, ge=1, le=50)
 
     enable_dev_cors: bool = False
     dev_cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:8501"])

@@ -19,6 +19,12 @@ def load_repo_default(*, nrows: int | None = None) -> pd.DataFrame:
     return pd.read_csv(REPO_DEFAULT_CSV, nrows=nrows)
 
 
+def read_repo_default_bytes() -> bytes:
+    if not REPO_DEFAULT_CSV.exists():
+        raise FileNotFoundError(f"Missing default dataset at {REPO_DEFAULT_CSV}")
+    return REPO_DEFAULT_CSV.read_bytes()
+
+
 def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     col_map = {
         "DATE": "date",

@@ -5,3 +5,5 @@ python-multipart
 pandas
 numpy
 pyarrow
+scikit-learn
+joblib
