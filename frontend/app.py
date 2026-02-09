@@ -65,6 +65,31 @@ def _sanitize_for_spreadsheet_export(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def _render_predict_demo_assets() -> None:
+    assets = Path(__file__).resolve().parent / "assets"
+    video_candidates = [
+        assets / "video" / "predict_demo.webm",
+    ]
+    img_low = assets / "images" / "predict_threshold_low.png"
+    img_high = assets / "images" / "predict_threshold_high.png"
+
+    video_path = next((p for p in video_candidates if p.exists()), None)
+    if video_path is None and not (img_low.exists() or img_high.exists()):
+        return
+
+    with st.expander("Demo", expanded=False):
+        if video_path is not None:
+            st.video(str(video_path))
+
+        c1, c2 = st.columns(2)
+        with c1:
+            if img_low.exists():
+                st.image(str(img_low), use_container_width=True)
+        with c2:
+            if img_high.exists():
+                st.image(str(img_high), use_container_width=True)
+
+
 @st.cache_data(show_spinner=False)
 def _load_and_prepare_csv_bytes(data: bytes, *, nrows: int | None) -> pd.DataFrame:
     df = load_csv_bytes(data, nrows=nrows)
@@ -83,7 +108,9 @@ def _load_and_prepare_repo_default(*, nrows: int | None) -> pd.DataFrame:
 
 def _sidebar_controls() -> dict[str, object]:
     st.sidebar.header("Dataset")
-    source = st.sidebar.radio("Source", options=["Upload a CSV", "Use repo dataset"], index=1)
+    source = st.sidebar.radio(
+        "Source", options=["Upload a CSV", "Use repo dataset"], index=1
+    )
     nrows = st.sidebar.number_input(
         "Rows",
         min_value=500,
@@ -114,7 +141,9 @@ def _load_dataset(source: str, *, nrows: int) -> pd.DataFrame | None:
 
     try:
         data = uploaded.getvalue()
-        st.session_state["dataset_name"] = str(uploaded.name) if getattr(uploaded, "name", None) else "uploaded.csv"
+        st.session_state["dataset_name"] = (
+            str(uploaded.name) if getattr(uploaded, "name", None) else "uploaded.csv"
+        )
         st.session_state["dataset_bytes"] = data
         return _load_and_prepare_csv_bytes(data, nrows=nrows)
     except Exception:
@@ -124,8 +153,13 @@ def _load_dataset(source: str, *, nrows: int) -> pd.DataFrame | None:
 
 def main() -> None:
     st.set_page_config(page_title="Financial Markets Explorer", layout="wide")
-    st.markdown("<div class='app-header'>Financial Markets Explorer</div>", unsafe_allow_html=True)
-    st.caption("Local-first dashboard for market data analytics and baseline ML inference.")
+    st.markdown(
+        "<div class='app-header'>Financial Markets Explorer</div>",
+        unsafe_allow_html=True,
+    )
+    st.caption(
+        "Local-first dashboard for market data analytics and baseline ML inference."
+    )
 
     st.markdown(
         """
@@ -200,7 +234,9 @@ def main() -> None:
         if isinstance(date_range, tuple) and len(date_range) == 2:
             date_range_value = date_range
             start, end = date_range
-            mask = (returns_df["date"] >= pd.Timestamp(start)) & (returns_df["date"] <= pd.Timestamp(end))
+            mask = (returns_df["date"] >= pd.Timestamp(start)) & (
+                returns_df["date"] <= pd.Timestamp(end)
+            )
             returns_df = returns_df.loc[mask].copy()
             df = df.loc[mask].copy()
 
@@ -211,7 +247,9 @@ def main() -> None:
     with tab_home:
         with st.container(border=True):
             st.subheader("Start here")
-            st.write("Pick a dataset source in the sidebar, then explore analytics by stock and date range.")
+            st.write(
+                "Pick a dataset source in the sidebar, then explore analytics by stock and date range."
+            )
 
         c1, c2 = st.columns([1, 1])
         with c1:
@@ -237,8 +275,18 @@ def main() -> None:
             c1, c2, c3, c4 = st.columns(4)
             c1.metric("Rows", value=f"{len(df):,}")
             c2.metric("Stocks", value=f"{df['symbol'].nunique():,}")
-            c3.metric("Start", value=str(df["date"].min().date()) if pd.notna(df["date"].min()) else "—")
-            c4.metric("End", value=str(df["date"].max().date()) if pd.notna(df["date"].max()) else "—")
+            c3.metric(
+                "Start",
+                value=(
+                    str(df["date"].min().date()) if pd.notna(df["date"].min()) else "—"
+                ),
+            )
+            c4.metric(
+                "End",
+                value=(
+                    str(df["date"].max().date()) if pd.notna(df["date"].max()) else "—"
+                ),
+            )
 
         movers = period_returns_by_symbol(df)
         if not movers.empty and movers["symbol"].nunique() >= 2:
@@ -246,47 +294,77 @@ def main() -> None:
                 st.subheader("Top movers")
                 top_n = 8
                 gainers = movers.head(top_n).copy()
-                losers = movers.tail(top_n).sort_values("period_return", ascending=True, kind="mergesort").copy()
+                losers = (
+                    movers.tail(top_n)
+                    .sort_values("period_return", ascending=True, kind="mergesort")
+                    .copy()
+                )
                 g_col, l_col = st.columns(2)
                 with g_col:
-                    st.plotly_chart(movers_bar(gainers, title="Gainers"), use_container_width=True)
+                    st.plotly_chart(
+                        movers_bar(gainers, title="Gainers"), use_container_width=True
+                    )
                 with l_col:
-                    st.plotly_chart(movers_bar(losers, title="Losers"), use_container_width=True)
+                    st.plotly_chart(
+                        movers_bar(losers, title="Losers"), use_container_width=True
+                    )
 
         with st.container(border=True):
             st.subheader("Selected stock")
             stats = summary_for_symbol(returns_df, symbol)
             s1, s2, s3, s4 = st.columns(4)
             s1.metric("Days", value=f"{int(stats.get('count', 0.0)):,}")
-            s2.metric("Ann. return", value=f"{stats.get('annualized_return', float('nan')):.2%}")
-            s3.metric("Ann. vol", value=f"{stats.get('annualized_volatility', float('nan')):.2%}")
-            s4.metric("Sharpe-like", value=f"{stats.get('sharpe_like', float('nan')):.2f}")
+            s2.metric(
+                "Ann. return",
+                value=f"{stats.get('annualized_return', float('nan')):.2%}",
+            )
+            s3.metric(
+                "Ann. vol",
+                value=f"{stats.get('annualized_volatility', float('nan')):.2%}",
+            )
+            s4.metric(
+                "Sharpe-like", value=f"{stats.get('sharpe_like', float('nan')):.2f}"
+            )
 
             left, right = st.columns(2)
             with left:
                 st.plotly_chart(price_line(df, symbol), use_container_width=True)
             with right:
-                st.plotly_chart(returns_hist(returns_df, symbol), use_container_width=True)
+                st.plotly_chart(
+                    returns_hist(returns_df, symbol), use_container_width=True
+                )
                 st.caption("A wider spread suggests higher day-to-day volatility.")
 
     with tab_compare:
         with st.container(border=True):
-            counts = returns_df.groupby("symbol")["return"].count().sort_values(ascending=False)
+            counts = (
+                returns_df.groupby("symbol")["return"]
+                .count()
+                .sort_values(ascending=False)
+            )
             default = list(counts.head(8).index)
-            selected = st.multiselect("Stocks", options=list(counts.index), default=default, max_selections=12)
+            selected = st.multiselect(
+                "Stocks", options=list(counts.index), default=default, max_selections=12
+            )
             if len(selected) < 2:
                 st.info("Select at least two stocks.")
             else:
                 price_wide = prices_pivot_for_symbols(df, selected)
                 if not price_wide.empty:
-                    st.plotly_chart(normalized_price_lines(price_wide), use_container_width=True)
+                    st.plotly_chart(
+                        normalized_price_lines(price_wide), use_container_width=True
+                    )
 
                 wide = returns_pivot_for_symbols(returns_df, selected)
                 if wide.shape[1] >= 2:
                     st.plotly_chart(corr_heatmap(wide), use_container_width=True)
-                    st.caption("Higher correlation means returns tend to move together over the selected period.")
+                    st.caption(
+                        "Higher correlation means returns tend to move together over the selected period."
+                    )
 
     with tab_predict:
+        _render_predict_demo_assets()
+
         runs = list_runs(artifacts_dir=Path("artifacts"))
         run_options = {r.label: r.run_id for r in runs}
         if "predict_result" not in st.session_state:
@@ -296,12 +374,19 @@ def main() -> None:
 
         with st.container(border=True):
             st.subheader("Step 1 — Dataset")
-            source_mode = st.radio(" ", options=["Use current dataset", "Use dataset_id"], horizontal=True, label_visibility="collapsed")
+            source_mode = st.radio(
+                " ",
+                options=["Use current dataset", "Use dataset_id"],
+                horizontal=True,
+                label_visibility="collapsed",
+            )
             dataset_id = ""
             file_bytes = None
             file_name = None
             if source_mode == "Use dataset_id":
-                dataset_id = st.text_input("dataset_id", value="", placeholder="e.g. 46648df5...")
+                dataset_id = st.text_input(
+                    "dataset_id", value="", placeholder="e.g. 46648df5..."
+                )
             else:
                 file_bytes = st.session_state.get("dataset_bytes")
                 file_name = st.session_state.get("dataset_name")
@@ -312,7 +397,9 @@ def main() -> None:
             if not run_options:
                 st.warning("No saved runs found in `artifacts/`.")
             else:
-                selected_label = st.selectbox("Model run", options=list(run_options.keys()), index=0)
+                selected_label = st.selectbox(
+                    "Model run", options=list(run_options.keys()), index=0
+                )
                 run_id = run_options[selected_label]
 
         with st.container(border=True):
@@ -344,7 +431,9 @@ def main() -> None:
                             st.write(f"**Timestamp**: {created_at}")
 
                         st.write(f"**Training window**: {train_window}")
-                        st.write("**Feature groups**: rolling returns and volatility, price range, rolling volume.")
+                        st.write(
+                            "**Feature groups**: rolling returns and volatility, price range, rolling volume."
+                        )
 
         with st.container(border=True):
             st.subheader("Step 3 — Predict")
@@ -370,11 +459,16 @@ def main() -> None:
                     "Include 'Where it fails' analysis (may be slower)",
                     value=False,
                 )
-            can_predict = (
-                run_id != ""
-                and ((dataset_id.strip() != "") or (file_bytes is not None and len(file_bytes) > 0))
+            can_predict = run_id != "" and (
+                (dataset_id.strip() != "")
+                or (file_bytes is not None and len(file_bytes) > 0)
             )
-            submitted = st.button(f"Predict for {symbol}", type="primary", disabled=not can_predict, use_container_width=True)
+            submitted = st.button(
+                f"Predict for {symbol}",
+                type="primary",
+                disabled=not can_predict,
+                use_container_width=True,
+            )
             if submitted:
                 with st.spinner("Running inference..."):
                     try:
@@ -407,17 +501,31 @@ def main() -> None:
                 r1.metric("Prob(up)", value=f"{prob:.3f}")
                 r2.metric("Direction", value="Up" if lbl == 1 else "Down")
                 r3.metric("As of", value=str(result["as_of"]))
-                st.caption("Direction is assigned using the selected probability threshold.")
+                st.caption(
+                    "Direction is assigned using the selected probability threshold."
+                )
 
                 tm = result.get("threshold_metrics", None)
                 if isinstance(tm, dict):
-                    with st.expander("Threshold metrics (recent window)", expanded=False):
+                    with st.expander(
+                        "Threshold metrics (recent window)", expanded=False
+                    ):
                         c1, c2, c3, c4 = st.columns(4)
-                        c1.metric("Threshold", value=f"{float(tm.get('threshold', 0.5)):.2f}")
-                        c2.metric("Precision", value=f"{float(tm.get('precision', float('nan'))):.3f}")
-                        c3.metric("Recall", value=f"{float(tm.get('recall', float('nan'))):.3f}")
+                        c1.metric(
+                            "Threshold", value=f"{float(tm.get('threshold', 0.5)):.2f}"
+                        )
+                        c2.metric(
+                            "Precision",
+                            value=f"{float(tm.get('precision', float('nan'))):.3f}",
+                        )
+                        c3.metric(
+                            "Recall",
+                            value=f"{float(tm.get('recall', float('nan'))):.3f}",
+                        )
                         c4.metric("Rows", value=f"{int(tm.get('window_rows', 0)):,}")
-                        st.caption("These metrics are computed on the last labeled rows available in the dataset.")
+                        st.caption(
+                            "These metrics are computed on the last labeled rows available in the dataset."
+                        )
 
                 fa = result.get("failure_analysis", None)
                 if isinstance(fa, dict):
@@ -429,8 +537,15 @@ def main() -> None:
                             st.subheader("By volatility regime")
                             st.dataframe(rdf, use_container_width=True, hide_index=True)
                             if "balanced_accuracy" in rdf.columns:
-                                fig = px.bar(rdf, x="regime", y="balanced_accuracy", title="Balanced accuracy by regime")
-                                fig.update_layout(margin=dict(l=10, r=10, t=40, b=10), height=320)
+                                fig = px.bar(
+                                    rdf,
+                                    x="regime",
+                                    y="balanced_accuracy",
+                                    title="Balanced accuracy by regime",
+                                )
+                                fig.update_layout(
+                                    margin=dict(l=10, r=10, t=40, b=10), height=320
+                                )
                                 st.plotly_chart(fig, use_container_width=True)
 
                         if isinstance(by_year, list) and by_year:
@@ -438,37 +553,71 @@ def main() -> None:
                             st.subheader("By year")
                             st.dataframe(ydf, use_container_width=True, hide_index=True)
                             if "balanced_accuracy" in ydf.columns:
-                                fig2 = px.line(ydf.sort_values("year"), x="year", y="balanced_accuracy", markers=True, title="Balanced accuracy by year")
-                                fig2.update_layout(margin=dict(l=10, r=10, t=40, b=10), height=320)
+                                fig2 = px.line(
+                                    ydf.sort_values("year"),
+                                    x="year",
+                                    y="balanced_accuracy",
+                                    markers=True,
+                                    title="Balanced accuracy by year",
+                                )
+                                fig2.update_layout(
+                                    margin=dict(l=10, r=10, t=40, b=10), height=320
+                                )
                                 st.plotly_chart(fig2, use_container_width=True)
 
                 expl = result.get("explanation", None)
-                if isinstance(expl, dict) and expl.get("method") == "logreg_contributions":
+                if (
+                    isinstance(expl, dict)
+                    and expl.get("method") == "logreg_contributions"
+                ):
                     pos = expl.get("top_positive", [])
                     neg = expl.get("top_negative", [])
                     items = []
                     for d in neg:
-                        items.append({"feature": d["feature"], "contribution": float(d["contribution"])})
+                        items.append(
+                            {
+                                "feature": d["feature"],
+                                "contribution": float(d["contribution"]),
+                            }
+                        )
                     for d in pos:
-                        items.append({"feature": d["feature"], "contribution": float(d["contribution"])})
+                        items.append(
+                            {
+                                "feature": d["feature"],
+                                "contribution": float(d["contribution"]),
+                            }
+                        )
                     if items:
                         edf = pd.DataFrame(items).dropna().sort_values("contribution")
-                        fig = px.bar(edf, x="contribution", y="feature", orientation="h")
-                        fig.update_layout(margin=dict(l=10, r=10, t=10, b=10), height=320)
+                        fig = px.bar(
+                            edf, x="contribution", y="feature", orientation="h"
+                        )
+                        fig.update_layout(
+                            margin=dict(l=10, r=10, t=10, b=10), height=320
+                        )
                         st.plotly_chart(fig, use_container_width=True)
-                        st.caption("Positive contributions push the probability toward “Up”; negative contributions push toward “Down”.")
+                        st.caption(
+                            "Positive contributions push the probability toward “Up”; negative contributions push toward “Down”."
+                        )
 
                 feats = result.get("features", {})
                 if isinstance(feats, dict) and feats:
                     with st.expander("Features", expanded=False):
                         fdf = (
-                            pd.DataFrame([{"feature": k, "value": float(v)} for k, v in feats.items()])
+                            pd.DataFrame(
+                                [
+                                    {"feature": k, "value": float(v)}
+                                    for k, v in feats.items()
+                                ]
+                            )
                             .sort_values("feature")
                             .reset_index(drop=True)
                         )
                         st.dataframe(fdf, use_container_width=True, hide_index=True)
 
-        st.caption("This is a baseline model for exploration and does not constitute financial advice.")
+        st.caption(
+            "This is a baseline model for exploration and does not constitute financial advice."
+        )
 
     with tab_quality:
         with st.container(border=True):
@@ -477,7 +626,9 @@ def main() -> None:
             st.metric("Duplicate (date, symbol)", value=int(dup.sum()))
 
             missing = df[["date", "symbol", "close"]].isna().sum()
-            st.dataframe(missing.rename("missing_rows").to_frame(), use_container_width=True)
+            st.dataframe(
+                missing.rename("missing_rows").to_frame(), use_container_width=True
+            )
 
         with st.container(border=True):
             st.subheader("Export")
@@ -495,4 +646,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
