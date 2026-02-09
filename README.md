@@ -40,7 +40,7 @@ py -0p
 Start the app:
 
 ```powershell
-cd C:\Users\hima2\Financial-Markets-Analysis
+cd C:\Users\.\Financial-Markets-Analysis
 .\scripts\run_frontend.ps1
 ```
 
@@ -49,21 +49,21 @@ cd C:\Users\hima2\Financial-Markets-Analysis
 - One command (recommended):
 
 ```powershell
-cd C:\Users\hima2\Financial-Markets-Analysis
+cd C:\Users\.\Financial-Markets-Analysis
 .\scripts\run_all.ps1
 ```
 
 - Run the backend in one terminal:
 
 ```powershell
-cd C:\Users\hima2\Financial-Markets-Analysis
+cd C:\Users\.\Financial-Markets-Analysis
 py -3.10 -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
 ```
 
 - Run the frontend in another terminal:
 
 ```powershell
-cd C:\Users\hima2\Financial-Markets-Analysis
+cd C:\Users\.\Financial-Markets-Analysis
 .\scripts\run_frontend.ps1
 ```
 
@@ -73,12 +73,12 @@ cd C:\Users\hima2\Financial-Markets-Analysis
 
 ### Deployment note
 
-This project is intentionally **local-first**. If you host it, uploaded datasets and saved models live on the server, not on the visitor’s device.
+This project is intentionally **local-first**.
 
 If your machine policy blocks `pip --user`, use a single repo venv instead:
 
 ```powershell
-cd C:\Users\hima2\Financial-Markets-Analysis
+cd C:\Users\.\Financial-Markets-Analysis
 py -3.11 -m venv .venv
 .\.venv\Scripts\python -m pip install -r .\frontend\requirements.txt
 .\.venv\Scripts\python -m streamlit run .\frontend\app.py
@@ -89,7 +89,7 @@ py -3.11 -m venv .venv
 Install ML deps:
 
 ```powershell
-cd C:\Users\hima2\Financial-Markets-Analysis
+cd C:\Users\.\Financial-Markets-Analysis
 py -3.10 -m pip install -r .\ml\requirements.txt
 ```
 
